@@ -15,7 +15,6 @@ PubSubClient pubSubClient(awsEndpoint, 8883, msgReceived, wiFiClient);
 
 MMA7660 acc;
 
-int reqs = 0;
 void setup() {
   Serial.begin(115200); Serial.println();
   Serial.println("ESP8266 AWS IoT");
@@ -37,7 +36,7 @@ void setup() {
 }
 
 unsigned long lastPublish;
-int msgCount;
+int msgCount = 0;
 bool fall=false;
 
 void loop() {
@@ -48,29 +47,25 @@ void loop() {
   pubSubCheckConnect();
   
   acc.getAcceleration(&ax,&ay,&az);
-  if((ay>1.4 || ay <-1.4) && fall == false){
+  if((ay>1.4 || ay <-1.4) && fall== false ){
     fall=true;
-    reqs=0;
-    Serial.print("Caduta Avvertita ");
+    msgCount=0;
   }
-  
   if (millis() - lastPublish > 5000) {
-    if(fall && reqs <= 10){
-      String msg = String("{\"Warning: detected fall\"}");// + ++msgCount;
-      bool response = pubSubClient.publish("ruat/esp1/pub", msg.c_str());
-      reqs++;
+    if(fall && msgCount <= 10){
+      String msg = String("{\"message\":\"Warning: detected fall\"}");
+      boolean response = pubSubClient.publish("ruat/esp1/pub", msg.c_str()); 
       while(!response){
         response = pubSubClient.publish("ruat/esp1/pub", msg.c_str());
       }
-      if(reqs==10){
-        reqs=0;
+      if(msgCount==10){
+        msgCount=0;
         fall=false;
       }
       Serial.print("Published: "); Serial.println(msg);
       lastPublish = millis();
     }
   }
-  delay(50);
 }
 void al(){
     tone(12, 293.66, 300); 
@@ -88,8 +83,10 @@ void msgReceived(char* topic, byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
     fall=false;
   }
-  al();
-  al();
+  for (int i=0; i<10; i++) {
+    al();
+  }
+  
   Serial.println();
 }
 
@@ -101,7 +98,7 @@ void pubSubCheckConnect() {
       pubSubClient.connect("ESPthing");
     }
     Serial.println(" connected");
-    pubSubClient.subscribe("ruat/esp1/dash");
+    pubSubClient.subscribe("ruat/esp1/dash",1);
   }
   pubSubClient.loop();
 }
